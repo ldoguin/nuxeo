@@ -39,7 +39,6 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.db.Column;
 import org.nuxeo.ecm.core.storage.sql.jdbc.db.Table;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.ecm.directory.AbstractDirectory;
-import org.nuxeo.ecm.directory.DirectoryCSVLoader;
 import org.nuxeo.ecm.directory.DirectoryException;
 import org.nuxeo.ecm.directory.Session;
 import org.nuxeo.runtime.api.Framework;
@@ -138,31 +137,8 @@ public class SQLDirectory extends AbstractDirectory {
         return (SQLDirectoryDescriptor) descriptor;
     }
 
-    /**
-     * Lazily initializes the connection.
-     *
-     * @return {@code true} if CSV data should be loaded
-     * @since 8.4
-     */
-    protected boolean initConnectionIfNeeded() {
-        // double checked locking with volatile pattern to ensure concurrent lazy init
-        if (dialect == null) {
-            synchronized (this) {
-                if (dialect == null) {
-                    return initConnection();
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Initializes the table.
-     *
-     * @return {@code true} if CSV data should be loaded
-     * @since 6.0
-     */
-    protected boolean initConnection() {
+    @Override
+    public boolean initializeConnection() {
         initSchemaFieldMap();
         SQLDirectoryDescriptor descriptor = getDescriptor();
         try (Connection sqlConnection = getConnection()) {
@@ -211,7 +187,13 @@ public class SQLDirectory extends AbstractDirectory {
             }
 
             SQLHelper helper = new SQLHelper(sqlConnection, table, descriptor.getCreateTablePolicy());
-            return helper.setupTable();
+            boolean loadData = helper.setupTable();
+            // commit the transaction so that tables are committed
+            if (TransactionHelper.isTransactionActiveOrMarkedRollback()) {
+                TransactionHelper.commitOrRollbackTransaction();
+                TransactionHelper.startTransaction();
+            }
+            return loadData;
         } catch (SQLException e) {
             // exception on close
             throw new DirectoryException(e);
@@ -232,14 +214,8 @@ public class SQLDirectory extends AbstractDirectory {
 
     @Override
     public Session getSession() {
-        boolean loadData = initConnectionIfNeeded();
         SQLSession session = new SQLSession(this, getDescriptor());
         addSession(session);
-        if (loadData && descriptor.getDataFileName() != null) {
-            Schema schema = Framework.getService(SchemaManager.class).getSchema(getSchema());
-            Framework.doPrivileged(() -> DirectoryCSVLoader.loadData(descriptor.getDataFileName(),
-                    descriptor.getDataFileCharacterSeparator(), schema, session::createEntry));
-        }
         return session;
     }
 

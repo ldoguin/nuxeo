@@ -115,7 +115,7 @@ public class MongoDBReference extends AbstractReference {
             return;
         }
         try {
-            MongoCollection<Document> coll = mongoSession.getCollection(collection);
+            MongoCollection<Document> coll = getCollection(mongoSession);
             List<Document> newDocs = targetIds.stream()
                                               .map(targetId -> buildDoc(sourceId, targetId))
                                               .filter(doc -> coll.count(doc) == 0)
@@ -131,7 +131,7 @@ public class MongoDBReference extends AbstractReference {
     @Override
     public void addLinks(List<String> sourceIds, String targetId, Session session) {
         MongoDBSession mongodbSession = (MongoDBSession) session;
-        MongoCollection<Document> coll = mongodbSession.getCollection(collection);
+        MongoCollection<Document> coll = getCollection(mongodbSession);
         List<Document> newDocs = sourceIds.stream()
                                           .map(sourceId -> buildDoc(sourceId, targetId))
                                           .filter(doc -> coll.count(doc) == 0)
@@ -179,7 +179,7 @@ public class MongoDBReference extends AbstractReference {
 
     private void removeLinksFor(String field, String value, MongoDBSession session) {
         try {
-            DeleteResult result = session.getCollection(collection)
+            DeleteResult result = getCollection(session)
                                          .deleteMany(MongoDBSerializationHelper.fieldMapToBson(field, value));
             if (!result.wasAcknowledged()) {
                 throw new DirectoryException(
@@ -216,7 +216,7 @@ public class MongoDBReference extends AbstractReference {
     }
 
     private List<String> getIdsFor(String queryField, String value, String resultField, MongoDBSession session) {
-        FindIterable<Document> docs = session.getCollection(collection)
+        FindIterable<Document> docs = getCollection(session)
                                              .find(MongoDBSerializationHelper.fieldMapToBson(queryField, value));
         return StreamSupport.stream(docs.spliterator(), false)
                             .map(doc -> doc.getString(resultField))
@@ -269,7 +269,7 @@ public class MongoDBReference extends AbstractReference {
                 list.addAll(idsToDelete.stream().map(id -> buildDoc(id, value)).collect(Collectors.toList()));
             }
             Bson deleteDoc = new BasicDBObject("$or", list);
-            session.getCollection(collection).deleteMany(deleteDoc);
+            getCollection(session).deleteMany(deleteDoc);
         }
 
         if (!idsToAdd.isEmpty()) {
@@ -279,7 +279,7 @@ public class MongoDBReference extends AbstractReference {
             } else {
                 list = idsToAdd.stream().map(id -> buildDoc(id, value)).collect(Collectors.toList());
             }
-            session.getCollection(collection).insertMany(list);
+            getCollection(session).insertMany(list);
         }
     }
 
@@ -298,7 +298,7 @@ public class MongoDBReference extends AbstractReference {
 
         Consumer<Map<String, Object>> loader = map -> {
             Document doc = MongoDBSerializationHelper.fieldMapToBson(map);
-            MongoCollection<Document> coll = session.getCollection(collection);
+            MongoCollection<Document> coll = getCollection(session);
             if (coll.count(doc) == 0) {
                 coll.insertOne(doc);
             }
@@ -317,6 +317,10 @@ public class MongoDBReference extends AbstractReference {
             initialized = true;
         }
         return (MongoDBSession) getSourceDirectory().getSession();
+    }
+
+    protected MongoCollection<Document> getCollection(MongoDBSession session) {
+        return session.getDirectory().database.getCollection(collection);
     }
 
 }
