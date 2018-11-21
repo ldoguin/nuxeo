@@ -35,8 +35,6 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.transaction.Transaction;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -216,12 +214,12 @@ public class ReloadComponent extends DefaultComponent implements ReloadService {
         }
 
         // Deploy bundles
-        Transaction tx = TransactionHelper.suspendTransaction();
+        TransactionHelper.commitOrRollbackTransaction();
         try {
             _deployBundles(files);
             refreshComponents();
         } finally {
-            TransactionHelper.resumeTransaction(tx);
+            TransactionHelper.startTransaction();
         }
 
         log.info(() -> {
@@ -246,13 +244,13 @@ public class ReloadComponent extends DefaultComponent implements ReloadService {
         });
 
         // Undeploy bundles
-        Transaction tx = TransactionHelper.suspendTransaction();
+        TransactionHelper.commitOrRollbackTransaction();
         ReloadResult result = new ReloadResult();
         try {
             result.merge(_undeployBundles(bundleNames));
             refreshComponents();
         } finally {
-            TransactionHelper.resumeTransaction(tx);
+            TransactionHelper.startTransaction();
         }
 
         // Reload resources
@@ -290,8 +288,8 @@ public class ReloadComponent extends DefaultComponent implements ReloadService {
         flush();
         watch.stop("flush");
 
-        // Suspend current transaction
-        Transaction tx = TransactionHelper.suspendTransaction();
+        // Commit current transaction - stack will be refreshed
+        TransactionHelper.commitOrRollbackTransaction();
 
         try {
             // Stop or Standby the component manager
@@ -395,7 +393,7 @@ public class ReloadComponent extends DefaultComponent implements ReloadService {
                 throw new BundleException("Unable to reload properties", e);
             }
         } finally {
-            TransactionHelper.resumeTransaction(tx);
+            TransactionHelper.startTransaction();
         }
 
         log.info(() -> {
