@@ -50,6 +50,7 @@ import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.RuntimeFeature;
+import org.nuxeo.runtime.transaction.TransactionHelper;
 
 /**
  * @since 9.1
@@ -153,6 +154,27 @@ public abstract class AbstractKeyValueStoreTest {
 
         store.put(key, Long.valueOf(-123));
         assertEquals(Long.valueOf(-123), store.getLong(key));
+    }
+
+    /**
+     * Checks that things are done outside the main transaction.
+     */
+    @Test
+    public void testNotTransactional() {
+        String key = "foo";
+        String value = "bar";
+        // in a transaction
+        TransactionHelper.runInTransaction(() -> {
+            // set a value
+            store.put(key, value);
+            assertEquals(value, store.getString(key));
+            // then rollback
+            TransactionHelper.setTransactionRollbackOnly();
+        });
+        // check that after rollback value is still set
+        assertEquals(value, store.getString(key));
+        // including if we start a new transaction
+        TransactionHelper.runInTransaction(() -> assertEquals(value, store.getString(key)));
     }
 
     @Test
