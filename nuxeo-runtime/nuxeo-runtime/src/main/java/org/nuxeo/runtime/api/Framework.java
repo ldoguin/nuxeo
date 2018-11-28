@@ -87,6 +87,13 @@ public final class Framework {
     public static final String NUXEO_TESTING_SYSTEM_PROP = "org.nuxeo.runtime.testing";
 
     /**
+     * System property to disable caching on test mode to be able to reproduce production behaviour in tests.
+     *
+     * @since 10.10
+     */
+    public static final String NUXEO_TESTING_PROP_CACHE_DISABLED = "org.nuxeo.runtime.testing.cache.disabled";
+
+    /**
      * Property to control strict runtime mode
      *
      * @since 5.6
@@ -472,10 +479,14 @@ public final class Framework {
      * Activating this mode, some of the code may not behave as it would in production, to ease up testing.
      */
     public static boolean isTestModeSet() {
-        if (testModeSet == null) {
-            testModeSet = isBooleanPropertyTrue(NUXEO_TESTING_SYSTEM_PROP);
+        String testModeCacheDisabled = System.getProperty(NUXEO_TESTING_PROP_CACHE_DISABLED);
+        if (Boolean.FALSE.equals(Boolean.parseBoolean(testModeCacheDisabled))) {
+            if (testModeSet == null) {
+                testModeSet = isBooleanPropertyTrue(NUXEO_TESTING_SYSTEM_PROP);
+            }
+            return testModeSet;
         }
-        return testModeSet;
+        return isBooleanPropertyTrue(NUXEO_TESTING_SYSTEM_PROP);
     }
 
     /**
