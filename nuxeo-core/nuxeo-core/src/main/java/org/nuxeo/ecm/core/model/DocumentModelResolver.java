@@ -38,6 +38,7 @@ import org.nuxeo.ecm.core.api.PathRef;
 import org.nuxeo.ecm.core.api.local.LocalException;
 import org.nuxeo.ecm.core.schema.types.resolver.AbstractObjectResolver;
 import org.nuxeo.ecm.core.schema.types.resolver.ObjectResolver;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * This {@link ObjectResolver} allows to manage integrity for fields containing {@link DocumentModel} references (id or
@@ -221,7 +222,7 @@ public class DocumentModelResolver extends AbstractObjectResolver implements Obj
                         session = (CoreSession) context;
                     } else {
                         // otherwise open a new one
-                        closeableCoreSession = CoreInstance.openCoreSession(ref.repo);
+                        closeableCoreSession = Framework.doPrivileged(() -> CoreInstance.openCoreSession(ref.repo));
                         session = closeableCoreSession;
                     }
                 } else {
@@ -229,7 +230,7 @@ public class DocumentModelResolver extends AbstractObjectResolver implements Obj
                     session = (CoreSession) context;
                     if (session == null) {
                         // use the default repository if none is provided in the context
-                        closeableCoreSession = CoreInstance.openCoreSession(null);
+                        closeableCoreSession = Framework.doPrivileged(() -> CoreInstance.openCoreSession(null));
                         session = closeableCoreSession;
                     }
                 }
