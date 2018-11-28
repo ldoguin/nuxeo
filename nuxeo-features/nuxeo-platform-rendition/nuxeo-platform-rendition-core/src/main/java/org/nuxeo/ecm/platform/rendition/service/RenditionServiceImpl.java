@@ -18,6 +18,7 @@
  */
 package org.nuxeo.ecm.platform.rendition.service;
 
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.ADD_CHILDREN;
 import static org.nuxeo.ecm.platform.rendition.Constants.RENDITION_SOURCE_ID_PROPERTY;
 import static org.nuxeo.ecm.platform.rendition.Constants.RENDITION_SOURCE_VERSIONABLE_ID_PROPERTY;
 
@@ -42,9 +43,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.automation.AutomationService;
 import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.CoreInstance;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentRef;
+import org.nuxeo.ecm.core.api.DocumentSecurityException;
 import org.nuxeo.ecm.core.api.IdRef;
 import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.api.NuxeoException;
@@ -587,6 +590,13 @@ public class RenditionServiceImpl extends DefaultComponent implements RenditionS
     @Override
     public DocumentModel publishRendition(DocumentModel doc, DocumentModel target, String renditionName,
             boolean override) {
+        CoreSession session = doc.getCoreSession();
+        if (!session.hasPermission(target.getRef(), ADD_CHILDREN)) {
+            log.debug("Permission '" + ADD_CHILDREN + "' is not granted to '" + session.getPrincipal().getName()
+                    + "' on document " + target.getPath());
+            throw new DocumentSecurityException(
+                    "Privilege '" + ADD_CHILDREN + "' is not granted to '" + session.getPrincipal().getName() + "'");
+        }
         Rendition rendition = StringUtils.isEmpty(renditionName)
                 ? getDefaultRendition(doc, Constants.DEFAULT_RENDTION_PUBLISH_REASON, true, null)
                 : getRendition(doc, renditionName, true);
@@ -594,7 +604,9 @@ public class RenditionServiceImpl extends DefaultComponent implements RenditionS
             throw new NuxeoException("Unable to render the document");
         }
         DocumentModel renditionDocument = rendition.getHostDocument();
-        DocumentModel publishedDocument = doc.getCoreSession().publishDocument(renditionDocument, target, override);
+        DocumentRef publishedDocumentRef = CoreInstance.doPrivileged(session,
+                (CoreSession s) -> s.publishDocument(renditionDocument, target, override).getRef());
+        DocumentModel publishedDocument = session.getDocument(publishedDocumentRef);
         if (override) {
             RenditionsRemover remover = new RenditionsRemover(publishedDocument);
             remover.runUnrestricted();
