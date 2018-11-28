@@ -33,6 +33,8 @@ public class DownloadablePackageOption {
 
     protected boolean exclusive;
 
+    protected String selectionType;
+
     protected boolean selected = false;
 
     protected String label;
@@ -70,6 +72,10 @@ public class DownloadablePackageOption {
                 this.exclusive = false;
             }
         }
+    }
+
+    public void setSelectionType(String selectionType) {
+        this.selectionType = selectionType;
     }
 
     public boolean isSelected() {
